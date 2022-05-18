@@ -27,15 +27,25 @@ module Pronto
     def inspect(patch)
       patch_path = patch.new_file_full_path
       offenses = run_fasterer(patch_path)
-      offenses.map do |offense|
-        next unless patch.added_lines.find { |line| line.new_lineno == offense.line_number }
+      messages = []
+      offenses.each do |offense|
+        added_line = patch.added_lines.find { |line| line.new_lineno == offense.line_number }
+        next unless added_line
 
-        Message.new(patch_path, offense.line_number, :warning, offense.explanation, nil, self.class)
+        messages << message(patch_path, added_line, offense.explanation)
       end
+
+      messages
+    end
+
+    def message(path, line, text)
+      Message.new(path, line, :warning, text, nil, self.class)
     end
 
     def run_fasterer(path)
-      ::Fasterer::Analyzer.new(path).scan
+      analyzer = ::Fasterer::Analyzer.new(path)
+      analyzer.scan
+      analyzer.errors
     end
   end
 end
