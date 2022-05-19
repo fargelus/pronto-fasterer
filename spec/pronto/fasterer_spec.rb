@@ -1,35 +1,55 @@
 # frozen_string_literal: true
 
-require "open3"
+require "rugged/patch"
 
 RSpec.describe Pronto::Fasterer do
-  let(:pronto_cmd) { "pronto run --unstaged -r fasterer" }
-  let(:pronto_output) { Open3.capture2(pronto_cmd).first }
-  let(:file_path) { File.join(Dir.pwd, "spec", "files", "offense.rb") }
-  let(:file_content) { File.read(file_path) }
+  let(:patch) { Rugged::Patch.from_strings }
+  let(:repo) { Pronto::Git::Repository.new(Dir.pwd) }
+  let(:pronto_patches) { Pronto::Git::Patches.new(repo, nil, [patch]) }
 
-  context "when file didn't modified" do
+  subject(:output) { described_class.new(pronto_patches).run }
+
+  context "when no patches at all" do
     it "hasn't got any output" do
-      expect(pronto_output.empty?).to be true
+      expect(output).to eql []
     end
   end
 
-  context "when file modified" do
-    let(:analyzer) { ::Fasterer::Analyzer.new(file_path) }
-    let(:offense) do
-      analyzer.errors[:shuffle_first_vs_sample].first.explanation
+  context "when file is not ruby file" do
+    let(:patch) { Rugged::Patch.from_strings(nil, "added\n") }
+
+    it "hasn't got any output" do
+      expect(output).to eql []
+    end
+  end
+
+  context "when file added" do
+    let(:file) { File.new("spec/files/offense.rb") }
+    let(:addition) { "test" }
+    let(:patch) { Rugged::Patch.from_strings(nil, addition, old_path: nil, new_path: file.path) }
+
+    it "hasn't detect any offenses" do
+      expect(output).to eql []
     end
 
-    before do
-      File.write(file_path, "[].shuffle.first")
-      analyzer.scan
-    end
+    context "when has offense" do
+      let(:addition) { "[].shuffle.first" }
+      let(:analyzer) { ::Fasterer::Analyzer.new(file.path) }
+      let(:offense) do
+        analyzer.errors[:shuffle_first_vs_sample].first.explanation
+      end
 
-    after { File.write(file_path, "") }
+      before do
+        File.write(file.path, addition)
+        analyzer.scan
+      end
 
-    it "has same output as fasterer" do
-      expect(pronto_output.empty?).to be false
-      expect(pronto_output).to match offense
+      after { File.write(file.path, "") }
+
+      it "has same output as fasterer" do
+        expect(output.empty?).to be false
+        expect(output.first.msg).to eql offense
+      end
     end
   end
 end

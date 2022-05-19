@@ -10,7 +10,7 @@ module Pronto
       return [] if !@patches || @patches.count.zero?
 
       @patches.select { |patch| valid_patch?(patch) }
-              .map { |patch| inspect(patch) }
+              .flat_map { |patch| inspect(patch) }
               .compact
     end
 
