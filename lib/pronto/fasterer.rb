@@ -2,6 +2,7 @@
 
 require "pronto"
 require "fasterer/analyzer"
+require "fasterer/config"
 
 module Pronto
   class Fasterer < Runner
@@ -20,7 +21,11 @@ module Pronto
       return false unless patch.additions.positive?
 
       # Return boolean value to determine if patch is valid for this runner.
-      file_path = patch.new_file_full_path
+      file_path = patch.new_file_path
+      target_file?(file_path) && !fasterer_config.ignored_files.member?(file_path)
+    end
+
+    def target_file?(file_path)
       rb_file?(file_path) || rake_file?(file_path)
     end
 
@@ -29,6 +34,8 @@ module Pronto
       offenses = run_fasterer(patch_path)
       messages = []
       offenses.each do |offense|
+        next if fasterer_config.ignored_speedups.include?(offense.name)
+
         added_line = patch.added_lines.find { |line| line.new_lineno == offense.line_number }
         next unless added_line
 
@@ -36,6 +43,10 @@ module Pronto
       end
 
       messages
+    end
+
+    def fasterer_config
+      @fasterer_config ||= ::Fasterer::Config.new
     end
 
     def message(path, line, text)
