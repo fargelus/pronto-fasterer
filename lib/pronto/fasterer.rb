@@ -30,7 +30,7 @@ module Pronto
     end
 
     def inspect(patch)
-      patch_path = patch.new_file_full_path
+      patch_path = patch.new_file_path
       offenses = run_fasterer(patch_path)
       messages = []
       offenses.each do |offense|
